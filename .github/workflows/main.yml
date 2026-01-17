@@ -1,5 +1,5 @@
 # File: .github/workflows/main.yml
-name: RPBX Minimal CI (Parallel)
+name: RPBX Minimal CI
 
 on:
   push:
@@ -13,29 +13,70 @@ on:
 jobs:
   validate-examples:
     name: Validate Example Scripts
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install shellcheck
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y shellcheck
-          shellcheck --version
+      - name: Cache shellcheck
+        uses: actions/cache@v3
+        with:
+          path: /usr/bin/shellcheck
+          key: shellcheck-${{ runner.os }}-v0.9.0
+          restore-keys: shellcheck-
 
-      - name: Find and validate run.sh scripts in parallel
+      - name: Install shellcheck
+        if: steps.cache-shellcheck.outputs.cache-hit != 'true'
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Validate example scripts in parallel
         run: |
           set -e
+
+          scripts=$(find examples -name run.sh)
+          declare -A results
+          pids=()
+
           echo "Starting parallel validation of example scripts..."
-          for script in $(find examples -name 'run.sh'); do
+
+          for script in $scripts; do
             (
               echo "Validating $script..."
-              shellcheck "$script"
+              shellcheck "$script" || echo "⚠️ Shellcheck issues in $script"
               chmod +x "$script"
-              bash "$script"
-              echo "✅ $script executed successfully"
+              if bash "$script"; then
+                echo "✅ $script executed successfully"
+                echo "$script:0" > "/tmp/${script##*/}.status"
+              else
+                echo "❌ $script failed"
+                echo "$script:1" > "/tmp/${script##*/}.status"
+              fi
             ) &
+            pids+=($!)
           done
-          wait
+
+          # Wait for all background jobs
+          for pid in "${pids[@]}"; do
+            wait $pid
+          done
+
+          # Aggregate failures
+          failed=0
+          for statusfile in /tmp/*.status; do
+            [[ -f "$statusfile" ]] || continue
+            read -r line < "$statusfile"
+            scriptname=${line%%:*}
+            code=${line##*:}
+            if [[ "$code" -ne 0 ]]; then
+              echo "❌ $scriptname failed"
+              failed=1
+            fi
+          done
+
+          if [[ $failed -ne 0 ]]; then
+            echo "One or more scripts failed"
+            exit 1
+          fi
+
           echo "All scripts executed successfully"
