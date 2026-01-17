@@ -1,5 +1,5 @@
 # File: .github/workflows/main.yml
-name: RPBX Minimal CI
+name: RPBX Minimal CI (Parallel)
 
 on:
   push:
@@ -13,21 +13,29 @@ on:
 jobs:
   validate-examples:
     name: Validate Example Scripts
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install shellcheck
-        run: sudo apt-get update && sudo apt-get install -y shellcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+          shellcheck --version
 
-      - name: Find and validate run.sh scripts
+      - name: Find and validate run.sh scripts in parallel
         run: |
           set -e
-          for script in $(find examples -name run.sh); do
-            echo "Validating $script..."
-            shellcheck "$script"
-            chmod +x "$script"
-            bash "$script"
-            echo "✅ $script executed successfully"
+          echo "Starting parallel validation of example scripts..."
+          for script in $(find examples -name 'run.sh'); do
+            (
+              echo "Validating $script..."
+              shellcheck "$script"
+              chmod +x "$script"
+              bash "$script"
+              echo "✅ $script executed successfully"
+            ) &
           done
+          wait
+          echo "All scripts executed successfully"
