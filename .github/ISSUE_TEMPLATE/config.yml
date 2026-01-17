@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: RPBX Discussions
+    url: https://github.com/rpbx-dev/rpbx/discussions
+    about: Open-ended discussion, ideation, or meta questions
