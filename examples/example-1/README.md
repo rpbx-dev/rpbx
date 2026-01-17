@@ -6,3 +6,4 @@ This is a small proof-of-concept to demonstrate RPBX iterative workflow.
 
 ```bash
 ./run.sh
+# PoC verification
