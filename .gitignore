@@ -18,3 +18,6 @@ venv/
 .vscode/
 *.swp
 .idea/.aider*
+
+# Aider artifacts
+.aider*
